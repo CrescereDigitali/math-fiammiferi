@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Il gioco dei fiammiferi – online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f1e7; --card:#fffdf8; --ink:#2b2622; --muted:#7a6f64; --line:#e4dccd;
+    --accent:#c4532d; --accent-2:#2f6b5a; --head:#d9472b; --stick:#e8c88f; --stick-d:#c9a465;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.45}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:34px;margin:0 0 4px;letter-spacing:-.01em}
+  h2{font-size:18px;margin:0 0 10px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;font-weight:500}
+  select,input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+  .btn{border:0;background:var(--accent);color:#fff;padding:10px 18px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.35;cursor:default}
+  .btn.green{background:var(--accent-2)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .code{font-family:Fraunces,Georgia,serif;font-size:48px;letter-spacing:.12em}
+  .status{font-size:20px;font-weight:600;margin:4px 0 14px;min-height:30px}
+  .count{font-family:Fraunces,Georgia,serif;font-size:64px;line-height:1;margin-right:12px}
+  .countlbl{color:var(--muted)}
+  .pile{display:flex;flex-wrap:wrap;gap:7px;padding:16px 4px;min-height:96px;align-items:flex-end}
+  .stick{width:12px;height:70px;border-radius:3px;background:linear-gradient(90deg,var(--stick),var(--stick-d));position:relative;transition:transform .15s}
+  .stick::before{content:"";position:absolute;top:-6px;left:-3px;width:18px;height:18px;border-radius:50% 50% 45% 45%;background:var(--head)}
+  .pile.click .stick{cursor:pointer}
+  .pile.click .stick.hl{transform:translateY(-8px);filter:brightness(1.08)}
+  .pilebox{border:1px dashed var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px}
+  .pilehead{display:flex;justify-content:space-between;color:var(--muted);font-size:14px}
+  .take{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .take .btn{min-width:110px}
+  .log{font-size:14px;color:var(--muted);max-height:220px;overflow:auto;border-top:1px solid var(--line);margin-top:16px;padding-top:10px}
+  .log div{padding:2px 0}
+  .log b{color:var(--ink)}
+  .seq{color:var(--ink);font-weight:500}
+  .score{display:flex;gap:18px;color:var(--muted);font-size:14px}
+  .score b{color:var(--ink);font-size:18px}
+  .hint{display:none;background:#eef5f1;border:1px solid #cfe3d9;color:var(--accent-2);border-radius:10px;padding:8px 12px;font-size:14px;margin-top:12px}
+  .teacher-on .hint{display:block}
+  .small{font-size:13px;color:var(--muted)}
+  .err{color:#b3261e;font-size:14px;margin-top:8px;min-height:20px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;background:#eee6d6;color:var(--muted)}
+  .pill.ok{background:#e5f4e4;color:var(--accent-2)}
+  .switch{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+  .switch input{width:auto}
+  .hidden{display:none !important}
+  ol{padding-left:20px;margin:8px 0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <h1>Il gioco dei fiammiferi</h1>
+  <p class="sub">Due giocatori, due computer, la stessa partita. A turno si tolgono fiammiferi: riesci a capire come si vince sempre?</p>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="grid2">
+    <div class="card">
+      <h2>Crea la partita</h2>
+      <p class="small">Per l'insegnante: crei la partita e detti il codice allo studente.</p>
+      <label>Il tuo nome</label>
+      <input id="hostName" value="Prof" maxlength="16">
+      <div style="height:12px"></div>
+      <button class="btn" id="createBtn">Crea partita</button>
+      <div class="err" id="hostErr"></div>
+    </div>
+    <div class="card">
+      <h2>Entra in una partita</h2>
+      <p class="small">Per lo studente: scrivi il codice che ti ha dato l'insegnante.</p>
+      <label>Il tuo nome</label>
+      <input id="guestName" value="" placeholder="Il tuo nome" maxlength="16">
+      <div style="height:10px"></div>
+      <label>Codice</label>
+      <input id="joinCode" inputmode="numeric" maxlength="4" placeholder="es. 4821">
+      <div style="height:12px"></div>
+      <button class="btn green" id="joinBtn">Entra</button>
+      <div class="err" id="guestErr"></div>
+    </div>
+  </div>
+
+  <!-- WAITING (host) -->
+  <div id="waiting" class="card hidden">
+    <h2>Codice della partita</h2>
+    <div class="code" id="codeShow">····</div>
+    <p class="small">Lo studente apre questa stessa pagina, sceglie "Entra in una partita" e scrive questo codice.</p>
+    <span class="pill" id="connPill">In attesa dello studente…</span>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="hidden">
+    <div class="card" id="hostSettings">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <strong>Impostazioni (le vede e le cambia solo l'insegnante)</strong>
+        <span class="pill ok" id="connPill2">Collegati</span>
+      </div>
+      <div class="settings">
+        <div><label>Gioco</label>
+          <select id="mode"><option value="one">Un mucchio</option><option value="two">Due mucchi</option></select></div>
+        <div class="one-only"><label>Fiammiferi all'inizio</label><input type="number" id="n" min="3" max="60" value="21"></div>
+        <div class="one-only"><label>Se ne possono togliere</label>
+          <select id="k"><option value="2">da 1 a 2</option><option value="3" selected>da 1 a 3</option><option value="4">da 1 a 4</option><option value="5">da 1 a 5</option><option value="6">da 1 a 6</option></select></div>
+        <div class="one-only"><label>Chi prende l'ultimo</label>
+          <select id="rule"><option value="win" selected>vince</option><option value="lose">perde</option></select></div>
+        <div class="two-only hidden"><label>Primo mucchio</label><input type="number" id="a" min="1" max="20" value="7"></div>
+        <div class="two-only hidden"><label>Secondo mucchio</label><input type="number" id="b" min="1" max="20" value="10"></div>
+        <div><label>Chi comincia</label>
+          <select id="first"><option value="host" id="optHost">io</option><option value="guest" id="optGuest">lo studente</option></select></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn" id="newBtn" style="width:100%">Nuova partita</button></div>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:14px">
+        <span class="small">Due mucchi: si toglie quanto si vuole da un solo mucchio; chi prende l'ultimo vince.</span>
+        <label class="switch"><input type="checkbox" id="teacher"> mostra a me la mossa vincente</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="row"><span class="count" id="count">–</span><span class="countlbl">fiammiferi<br>rimasti</span></div>
+        <div class="score" id="score"></div>
+      </div>
+      <div class="status" id="status"></div>
+      <div id="piles"></div>
+      <div class="take" id="take"></div>
+      <div class="hint" id="hint"></div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="card" id="guideCard">
+      <strong>Domande guida (le vede solo l'insegnante)</strong>
+      <ol>
+        <li>Se restano 3 fiammiferi e tocca a te, cosa fai? E se ne restano 4?</li>
+        <li>Prova con 5, 6, 7 e 8: in quali conviene essere di turno?</li>
+        <li>Guarda a fine partita i numeri rimasti dopo le mosse del vincitore: che cosa noti?</li>
+        <li>Perché funziona sempre? (Qualunque cosa tolga l'altro, io tolgo quello che manca per arrivare a 4.)</li>
+        <li>Cambiando le regole (da 1 a 4, chi prende l'ultimo perde), sai prevedere la strategia prima di giocare?</li>
+        <li>Con due mucchi: cosa succede se i mucchi sono uguali e tocca all'altro?</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const PREFIX = 'fiammiferi-vm-';
+  let role = null;      // 'host' | 'guest'
+  let peer = null, conn = null;
+  let st = null;        // authoritative on host, mirrored on guest
+
+  function show(id){ ['lobby','waiting','game'].forEach(x=>$(x).classList.toggle('hidden', x!==id)); }
+  const other = r => r==='host' ? 'guest' : 'host';
+
+  // ---------- strategy (for hints) ----------
+  function bestOne(r,k,rule){
+    const m=k+1, target = rule==='win'?0:1;
+    const t=((r-target)%m+m)%m;
+    return (t>=1 && t<=k && t<=r) ? t : 0;
+  }
+  function bestTwo(p){
+    if (p[0]===p[1]) return null;
+    const big = p[0]>p[1]?0:1;
+    return {pile:big, take:p[big]-p[1-big]};
+  }
+
+  // ---------- host logic ----------
+  function hostNewGame(){
+    const prevScore = st ? st.score : {host:0, guest:0};
+    const names = st ? st.names : {host:$('hostName').value.trim()||'Prof', guest:'Studente'};
+    const mode = $('mode').value;
+    const base = {mode, turn:$('first').value, over:false, winner:null, log:[], after:{host:[],guest:[]}, score:prevScore, names};
+    if (mode==='one'){
+      const N = Math.max(3, Math.min(60, parseInt($('n').value)||21)); $('n').value=N;
+      st = Object.assign(base, {r:N, k:parseInt($('k').value), rule:$('rule').value});
+    } else {
+      const A = Math.max(1, Math.min(20, parseInt($('a').value)||7)); $('a').value=A;
+      const B = Math.max(1, Math.min(20, parseInt($('b').value)||10)); $('b').value=B;
+      st = Object.assign(base, {p:[A,B]});
+    }
+    broadcast(); render();
+  }
+  function remaining(s){ return s.mode==='one' ? s.r : s.p[0]+s.p[1]; }
+  function hostApply(who, pile, take){
+    if (!st || st.over || st.turn!==who) return;
+    take = parseInt(take); pile = parseInt(pile)||0;
+    if (st.mode==='one'){
+      if (!(take>=1 && take<=st.k && take<=st.r)) return;
+      st.r -= take;
+      st.log.push(`<b>${esc(st.names[who])}</b> toglie ${take} → restano ${st.r}`);
+      st.after[who].push(String(st.r));
+    } else {
+      if (!(pile===0||pile===1) || !(take>=1 && take<=st.p[pile])) return;
+      st.p[pile] -= take;
+      st.log.push(`<b>${esc(st.names[who])}</b> toglie ${take} dal mucchio ${pile+1} → ${st.p[0]} e ${st.p[1]}`);
+      st.after[who].push(`${st.p[0]} e ${st.p[1]}`);
+    }
+    if (remaining(st)===0){
+      st.over = true;
+      const lastWins = st.mode==='two' || st.rule==='win';
+      st.winner = lastWins ? who : other(who);
+      st.score[st.winner]++;
+    } else st.turn = other(who);
+    broadcast(); render();
+  }
+  function broadcast(){ if (role==='host' && conn && conn.open) conn.send({type:'state', state:st}); }
+
+  // ---------- local move ----------
+  function myMove(pile, take){
+    if (!st || st.over || st.turn!==role) return;
+    if (role==='host') hostApply('host', pile, take);
+    else if (conn && conn.open) conn.send({type:'move', pile, take});
+  }
+
+  // ---------- render ----------
+  function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function sticks(count, idx, clickable){
+    let h=''; for (let i=0;i<count;i++) h+=`<div class="stick" data-pile="${idx}" data-i="${i}"></div>`;
+    return `<div class="pile ${clickable?'click':''}">${h}</div>`;
+  }
+  function render(){
+    $('hostSettings').classList.toggle('hidden', role!=='host');
+    $('guideCard').classList.toggle('hidden', role!=='host');
+    if (!st){ $('status').textContent = role==='guest' ? 'In attesa che l’insegnante avvii la partita…' : ''; $('count').textContent='–'; return; }
+    const me = role, them = other(role);
+    $('optHost').textContent = role==='host' ? 'io' : st.names.host;
+    $('optGuest').textContent = st.names.guest;
+    $('count').textContent = remaining(st);
+    $('score').innerHTML = `<span>${esc(st.names[me])} (tu) <b>${st.score[me]}</b></span><span>${esc(st.names[them])} <b>${st.score[them]}</b></span>`;
+    let s;
+    if (st.over) s = st.winner===me ? 'Hai vinto! Sapresti rifarlo?' : `Ha vinto ${st.names[them]}. Fortuna o strategia?`;
+    else s = st.turn===me ? 'Tocca a te' : `Tocca a ${st.names[them]}…`;
+    $('status').textContent = s;
+
+    const can = !st.over && st.turn===me;
+    if (st.mode==='one'){
+      $('piles').innerHTML = sticks(st.r, 0, false);
+      let b=''; for (let t=1;t<=st.k;t++) b+=`<button class="btn ${t%2?'':'green'}" data-take="${t}" ${(!can||t>st.r)?'disabled':''}>Togli ${t}</button>`;
+      $('take').innerHTML = b;
+    } else {
+      $('piles').innerHTML = [0,1].map(i=>`<div class="pilebox"><div class="pilehead"><span>Mucchio ${i+1}</span><span>${st.p[i]}</span></div>${sticks(st.p[i], i, can)}</div>`).join('');
+      $('take').innerHTML = can ? '<span class="small">Clicca un fiammifero: lo togli insieme a tutti quelli alla sua destra.</span>' : '';
+    }
+    let hint='';
+    if (role==='host' && !st.over){
+      if (st.mode==='one'){
+        const t=bestOne(st.r, st.k, st.rule), m=st.k+1;
+        hint = t ? `Mossa vincente per chi è di turno: togli ${t} (restano ${st.r-t}).` : 'Posizione perdente per chi è di turno.';
+        hint += st.rule==='win' ? ` Regola: lascia un multiplo di ${m}.` : ` Regola: lascia 1, ${1+m}, ${1+2*m}, … (multipli di ${m} più 1).`;
+      } else {
+        const m=bestTwo(st.p);
+        hint = m ? `Mossa vincente per chi è di turno: togli ${m.take} dal mucchio ${m.pile+1} (mucchi uguali).` : 'Mucchi uguali: chi è di turno perde se l’altro copia ogni mossa.';
+      }
+    }
+    $('hint').textContent = hint;
+    let lg = st.log.slice().reverse().map(x=>`<div>${x}</div>`).join('');
+    if (st.over) lg = `<div style="margin-bottom:6px">Rimasti dopo le mosse del vincitore (${esc(st.names[st.winner])}): <span class="seq">${st.after[st.winner].join(', ')}</span></div>` + lg;
+    $('log').innerHTML = lg || '<div>Nessuna mossa ancora.</div>';
+  }
+
+  // ---------- connection ----------
+  function setConnected(ok){
+    $('connPill2').textContent = ok ? 'Collegati' : 'Collegamento perso';
+    $('connPill2').classList.toggle('ok', ok);
+  }
+  function peerErrorText(err){
+    const t = err && err.type;
+    if (t==='peer-unavailable') return 'Nessuna partita con questo codice. Controlla il codice e che l’insegnante abbia la pagina aperta.';
+    if (t==='network' || t==='server-error' || t==='socket-error' || t==='socket-closed') return 'Problema di rete: controlla la connessione e riprova.';
+    if (t==='browser-incompatible') return 'Questo browser non supporta il gioco online: prova con Chrome, Firefox o Safari aggiornati.';
+    return 'Errore di collegamento (' + (t||'sconosciuto') + '). Riprova.';
+  }
+
+  function createGame(attempt){
+    if (typeof Peer === 'undefined'){ $('hostErr').textContent='Non riesco a caricare il collegamento online. Controlla la connessione e ricarica la pagina.'; return; }
+    attempt = attempt||0;
+    const code = String(1000 + Math.floor(Math.random()*9000));
+    role = 'host';
+    peer = new Peer(PREFIX + code);
+    peer.on('open', ()=>{ $('codeShow').textContent = code; show('waiting'); });
+    peer.on('error', err=>{
+      if (err.type==='unavailable-id' && attempt<5){ peer.destroy(); createGame(attempt+1); return; }
+      $('hostErr').textContent = peerErrorText(err);
+      if ($('waiting').classList.contains('hidden')===false) $('connPill').textContent = peerErrorText(err);
+    });
+    peer.on('connection', c=>{
+      if (conn && conn.open){ c.on('open', ()=>{ c.send({type:'busy'}); setTimeout(()=>c.close(), 300); }); return; }
+      conn = c;
+      conn.on('open', ()=>{ setConnected(true); });
+      conn.on('data', d=>{
+        if (!d || typeof d!=='object') return;
+        if (d.type==='hello'){
+          const gname = String(d.name||'Studente').slice(0,16) || 'Studente';
+          if (!st){
+            st = null; show('game');
+            const names = {host:$('hostName').value.trim()||'Prof', guest:gname};
+            st = {names, score:{host:0,guest:0}}; // seed names/score
+            hostNewGame();
+          } else { st.names.guest = gname; broadcast(); render(); }
+        } else if (d.type==='move'){
+          hostApply('guest', d.pile, d.take);
+        }
+      });
+      conn.on('close', ()=>{ setConnected(false); conn = null; });
+    });
+  }
+
+  function joinGame(){
+    if (typeof Peer === 'undefined'){ $('guestErr').textContent='Non riesco a caricare il collegamento online. Controlla la connessione e ricarica la pagina.'; return; }
+    const code = $('joinCode').value.trim();
+    if (!/^\d{4}$/.test(code)){ $('guestErr').textContent='Il codice è di 4 cifre.'; return; }
+    const name = $('guestName').value.trim() || 'Studente';
+    $('guestErr').textContent='Mi collego…';
+    role = 'guest';
+    peer = new Peer();
+    peer.on('error', err=>{ $('guestErr').textContent = peerErrorText(err); });
+    peer.on('open', ()=>{
+      conn = peer.connect(PREFIX + code, {reliable:true});
+      conn.on('open', ()=>{ $('guestErr').textContent=''; conn.send({type:'hello', name}); show('game'); render(); });
+      conn.on('data', d=>{
+        if (!d || typeof d!=='object') return;
+        if (d.type==='state'){ st = d.state; render(); }
+        if (d.type==='busy'){ show('lobby'); $('guestErr').textContent='In questa partita c’è già un altro studente.'; }
+      });
+      conn.on('close', ()=>{ $('status').textContent='Collegamento perso: ricarica la pagina e rientra con lo stesso codice.'; });
+    });
+  }
+
+  // ---------- events ----------
+  $('createBtn').addEventListener('click', ()=>{ $('hostErr').textContent=''; createGame(0); });
+  $('joinBtn').addEventListener('click', joinGame);
+  $('joinCode').addEventListener('keydown', e=>{ if (e.key==='Enter') joinGame(); });
+  $('newBtn').addEventListener('click', hostNewGame);
+  $('mode').addEventListener('change', ()=>{
+    const two = $('mode').value==='two';
+    document.querySelectorAll('.one-only').forEach(x=>x.classList.toggle('hidden', two));
+    document.querySelectorAll('.two-only').forEach(x=>x.classList.toggle('hidden', !two));
+  });
+  $('teacher').addEventListener('change', e=> $('app').classList.toggle('teacher-on', e.target.checked));
+  $('take').addEventListener('click', e=>{
+    const b = e.target.closest('button[data-take]'); if (!b || b.disabled) return;
+    myMove(0, parseInt(b.dataset.take));
+  });
+  $('piles').addEventListener('click', e=>{
+    const s = e.target.closest('.pile.click .stick'); if (!s || !st || st.mode!=='two') return;
+    const pile = parseInt(s.dataset.pile), i = parseInt(s.dataset.i);
+    myMove(pile, st.p[pile]-i);
+  });
+  $('piles').addEventListener('mouseover', e=>{
+    const s = e.target.closest('.pile.click .stick'); if (!s) return;
+    const i = parseInt(s.dataset.i);
+    s.parentNode.querySelectorAll('.stick').forEach(x=>x.classList.toggle('hl', parseInt(x.dataset.i)>=i));
+  });
+  $('piles').addEventListener('mouseout', e=>{
+    const p = e.target.closest('.pile'); if (p) p.querySelectorAll('.stick').forEach(x=>x.classList.remove('hl'));
+  });
+})();
+</script>
+</body>
+</html>
