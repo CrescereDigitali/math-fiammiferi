@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giochi di strategia – online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f1e7; --card:#fffdf8; --ink:#2b2622; --muted:#7a6f64; --line:#e4dccd;
+    --accent:#c4532d; --accent-2:#2f6b5a; --head:#d9472b; --stick:#e8c88f; --stick-d:#c9a465;
+    --me:#2f6b5a; --them:#c4532d; --choc:#7b4a2e; --choc-d:#5e3720;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.45}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 20px 60px}
+  h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:34px;margin:0 0 4px;letter-spacing:-.01em}
+  h2{font-size:18px;margin:0 0 10px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px;font-weight:500}
+  select,input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font:inherit;background:#fff;color:var(--ink)}
+  .btn{border:0;background:var(--accent);color:#fff;padding:10px 18px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.35;cursor:default}
+  .btn.green{background:var(--accent-2)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .code{font-family:Fraunces,Georgia,serif;font-size:48px;letter-spacing:.12em}
+  .status{font-size:20px;font-weight:600;margin:4px 0 14px;min-height:30px}
+  .big{font-family:Fraunces,Georgia,serif;font-size:64px;line-height:1;margin-right:12px}
+  .biglbl{color:var(--muted)}
+  .rules{color:var(--muted);font-size:14px;margin:0 0 6px}
+  /* nim */
+  .pile{display:flex;flex-wrap:wrap;gap:7px;padding:16px 4px;min-height:96px;align-items:flex-end}
+  .stick{width:12px;height:70px;border-radius:3px;background:linear-gradient(90deg,var(--stick),var(--stick-d));position:relative;transition:transform .15s}
+  .stick::before{content:"";position:absolute;top:-6px;left:-3px;width:18px;height:18px;border-radius:50% 50% 45% 45%;background:var(--head)}
+  .pile.click .stick{cursor:pointer}
+  .pile.click .stick.hl{transform:translateY(-8px);filter:brightness(1.08)}
+  .pilebox{border:1px dashed var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px}
+  .pilehead{display:flex;justify-content:space-between;color:var(--muted);font-size:14px}
+  .take{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .take .btn{min-width:90px}
+  /* cento */
+  .bar{height:14px;background:#efe7d8;border-radius:999px;overflow:hidden;margin:6px 0 14px}
+  .bar > div{height:100%;background:var(--accent-2);transition:width .3s}
+  /* quindici */
+  .nums{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin:8px 0}
+  .num{border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px 0;text-align:center;font-family:Fraunces,Georgia,serif;font-size:28px;cursor:default;color:var(--ink)}
+  .num.free.can{cursor:pointer}
+  .num.free.can:hover{border-color:var(--ink)}
+  .num.me{background:var(--me);color:#fff;border-color:var(--me)}
+  .num.them{background:var(--them);color:#fff;border-color:var(--them)}
+  .owned{display:flex;gap:24px;flex-wrap:wrap;font-size:15px;margin-top:6px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .magic{display:grid;grid-template-columns:repeat(3,52px);gap:6px;margin-top:8px}
+  .magic div{height:52px;display:flex;align-items:center;justify-content:center;border:1px solid #cfe3d9;border-radius:8px;background:#fff;font-weight:600}
+  .magic .me{background:var(--me);color:#fff}
+  .magic .them{background:var(--them);color:#fff}
+  /* cioccolato */
+  .choc{display:inline-grid;gap:4px;padding:10px;background:#efe7d8;border-radius:12px}
+  .sq{width:46px;height:46px;border-radius:6px;background:linear-gradient(135deg,var(--choc),var(--choc-d));box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+  .sq.eaten{background:transparent;box-shadow:none;border:1px dashed #d8ccb6}
+  .sq.poison{background:linear-gradient(135deg,#3f7d3a,#245322);position:relative}
+  .sq.poison::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px}
+  .choc.can .sq:not(.eaten){cursor:pointer}
+  .sq.hl{outline:3px solid #f2c14e;outline-offset:-3px;filter:brightness(1.15)}
+  /* common */
+  .log{font-size:14px;color:var(--muted);max-height:220px;overflow:auto;border-top:1px solid var(--line);margin-top:16px;padding-top:10px}
+  .log div{padding:2px 0}
+  .log b{color:var(--ink)}
+  .seq{color:var(--ink);font-weight:500}
+  .score{display:flex;gap:18px;color:var(--muted);font-size:14px}
+  .score b{color:var(--ink);font-size:18px}
+  .hint{display:none;background:#eef5f1;border:1px solid #cfe3d9;color:var(--accent-2);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:12px}
+  .teacher-on .hint{display:block}
+  .small{font-size:13px;color:var(--muted)}
+  .err{color:#b3261e;font-size:14px;margin-top:8px;min-height:20px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;background:#eee6d6;color:var(--muted)}
+  .pill.ok{background:#e5f4e4;color:var(--accent-2)}
+  .switch{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+  .switch input{width:auto}
+  .hidden{display:none !important}
+  ol{padding-left:20px;margin:8px 0}
+  @media (max-width:560px){ .nums{grid-template-columns:repeat(5,1fr)} .sq{width:34px;height:34px} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <h1>Giochi di strategia</h1>
+  <p class="sub">Due giocatori, due computer, la stessa partita. Riesci a capire come si vince sempre?</p>
+
+  <!-- LOBBY -->
+  <div id="lobby" class="grid2">
+    <div class="card">
+      <h2>Crea la partita</h2>
+      <p class="small">Per l'insegnante: crei la partita e detti il codice allo studente.</p>
+      <label>Il tuo nome</label>
+      <input id="hostName" value="Prof" maxlength="16">
+      <div style="height:12px"></div>
+      <button class="btn" id="createBtn">Crea partita</button>
+      <div class="err" id="hostErr"></div>
+    </div>
+    <div class="card">
+      <h2>Entra in una partita</h2>
+      <p class="small">Per lo studente: scrivi il codice che ti ha dato l'insegnante.</p>
+      <label>Il tuo nome</label>
+      <input id="guestName" placeholder="Il tuo nome" maxlength="16">
+      <div style="height:10px"></div>
+      <label>Codice</label>
+      <input id="joinCode" inputmode="numeric" maxlength="4" placeholder="es. 4821">
+      <div style="height:12px"></div>
+      <button class="btn green" id="joinBtn">Entra</button>
+      <div class="err" id="guestErr"></div>
+    </div>
+  </div>
+
+  <!-- WAITING -->
+  <div id="waiting" class="card hidden">
+    <h2>Codice della partita</h2>
+    <div class="code" id="codeShow">····</div>
+    <p class="small">Lo studente apre questa stessa pagina, sceglie "Entra in una partita" e scrive questo codice.</p>
+    <span class="pill" id="connPill">In attesa dello studente…</span>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="hidden">
+    <div class="card" id="hostSettings">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <strong>Impostazioni (le vede solo l'insegnante)</strong>
+        <span class="pill ok" id="connPill2">Collegati</span>
+      </div>
+      <div class="settings">
+        <div><label>Gioco</label>
+          <select id="gameSel">
+            <option value="nim">Fiammiferi</option>
+            <option value="cento">Il gioco del 100</option>
+            <option value="quindici">Il gioco del 15</option>
+            <option value="choc">Cioccolato avvelenato</option>
+          </select></div>
+        <!-- nim -->
+        <div class="g-nim"><label>Mucchi</label>
+          <select id="nPiles"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+        <div class="g-nim"><label id="lblS1">Fiammiferi</label><input type="number" id="s1" min="1" max="60" value="21"></div>
+        <div class="g-nim p2 hidden"><label>Mucchio 2</label><input type="number" id="s2" min="1" max="20" value="10"></div>
+        <div class="g-nim p3 hidden"><label>Mucchio 3</label><input type="number" id="s3" min="1" max="20" value="3"></div>
+        <div class="g-nim p1only"><label>Se ne possono togliere</label>
+          <select id="k"><option value="2">da 1 a 2</option><option value="3" selected>da 1 a 3</option><option value="4">da 1 a 4</option><option value="5">da 1 a 5</option><option value="6">da 1 a 6</option></select></div>
+        <div class="g-nim p1only"><label>Chi prende l'ultimo</label>
+          <select id="rule"><option value="win" selected>vince</option><option value="lose">perde</option></select></div>
+        <!-- cento -->
+        <div class="g-cento hidden"><label>Traguardo</label><input type="number" id="T" min="10" max="200" value="100"></div>
+        <div class="g-cento hidden"><label>Si aggiunge da 1 a</label><input type="number" id="m" min="2" max="15" value="10"></div>
+        <!-- choc -->
+        <div class="g-choc hidden"><label>Righe</label><input type="number" id="R" min="2" max="8" value="5"></div>
+        <div class="g-choc hidden"><label>Colonne</label><input type="number" id="C" min="2" max="10" value="5"></div>
+        <!-- common -->
+        <div><label>Chi comincia</label>
+          <select id="first"><option value="host" id="optHost">io</option><option value="guest" id="optGuest">lo studente</option></select></div>
+        <div style="display:flex;align-items:flex-end"><button class="btn" id="newBtn" style="width:100%">Nuova partita</button></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px">
+        <label class="switch"><input type="checkbox" id="teacher"> mostra a me la mossa vincente</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div><div class="rules" id="rulesTxt"></div></div>
+        <div class="score" id="score"></div>
+      </div>
+      <div class="status" id="status"></div>
+      <div id="board"></div>
+      <div class="hint" id="hint"></div>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="card" id="guideCard">
+      <strong>Domande guida (le vede solo l'insegnante)</strong>
+      <div id="guide"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const PREFIX = 'fiammiferi-vm-';
+  let role = null, peer = null, conn = null, st = null;
+  const other = r => r==='host' ? 'guest' : 'host';
+  const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clamp = (v,a,b,d) => { v = parseInt(v); if (isNaN(v)) v = d; return Math.max(a, Math.min(b, v)); };
+  function show(id){ ['lobby','waiting','game'].forEach(x=>$(x).classList.toggle('hidden', x!==id)); }
+
+  // =====================================================================
+  // GAMES
+  // =====================================================================
+  const LINES15 = [[2,7,6],[9,5,1],[4,3,8],[2,9,4],[7,5,3],[6,1,8],[2,5,8],[6,5,4]];
+
+  const GAMES = {
+    // ---------------- NIM ----------------
+    nim: {
+      readCfg(){
+        const n = parseInt($('nPiles').value);
+        const piles = [clamp($('s1').value,1,n===1?60:20,n===1?21:7)];
+        if (n>=2) piles.push(clamp($('s2').value,1,20,10));
+        if (n>=3) piles.push(clamp($('s3').value,1,20,3));
+        return n===1 ? {piles, k:parseInt($('k').value), rule:$('rule').value} : {piles, k:0, rule:'win'};
+      },
+      init(cfg){ return {p: cfg.piles.slice()}; },
+      rules(cfg){
+        if (cfg.piles.length===1) return `A turno si tolgono da 1 a ${cfg.k} fiammiferi. Chi prende l'ultimo ${cfg.rule==='win'?'vince':'perde'}.`;
+        return `A turno si tolgono quanti fiammiferi si vuole, ma da un solo mucchio. Chi prende l'ultimo vince.`;
+      },
+      apply(s, mv){
+        const p = s.data.p, pile = parseInt(mv.pile)||0, take = parseInt(mv.take);
+        if (!(pile>=0 && pile<p.length) || !(take>=1 && take<=p[pile]) || (s.cfg.k && take>s.cfg.k)) return null;
+        p[pile] -= take;
+        const rest = p.length===1 ? `restano ${p[0]}` : `mucchi ${p.join(' – ')}`;
+        const txt = p.length===1 ? `toglie ${take} → ${rest}` : `toglie ${take} dal mucchio ${pile+1} → ${rest}`;
+        const done = p.reduce((a,b)=>a+b,0)===0;
+        return {txt, snap: p.join(' – '), over: done, moverWins: done ? s.cfg.rule==='win' : null};
+      },
+      hint(s){
+        const p = s.data.p;
+        if (p.length===1){
+          const k = s.cfg.k, m = k+1, target = s.cfg.rule==='win'?0:1;
+          const t = ((p[0]-target)%m+m)%m;
+          let h = (t>=1 && t<=k && t<=p[0]) ? `Mossa vincente: togli ${t} (restano ${p[0]-t}).` : 'Posizione perdente per chi è di turno.';
+          return h + (s.cfg.rule==='win' ? ` Regola: lascia un multiplo di ${m}.` : ` Regola: lascia 1, ${1+m}, ${1+2*m}, … (multipli di ${m} più 1).`);
+        }
+        const x = p.reduce((a,b)=>a^b,0);
+        if (!x) return p.length===2 ? 'Mucchi uguali: chi è di turno perde se l’altro copia ogni mossa.' : 'Posizione perdente per chi è di turno (ogni potenza di 2 compare un numero pari di volte).';
+        for (let i=0;i<p.length;i++){ const tgt = p[i]^x; if (tgt<p[i]) return `Mossa vincente: togli ${p[i]-tgt} dal mucchio ${i+1} (mucchi ${p.map((v,j)=>j===i?tgt:v).join(' – ')}).` + (p.length===2?' Rendi i mucchi uguali.':''); }
+        return '';
+      },
+      render(s, can){
+        const p = s.data.p;
+        const sticks = (count, idx, click) => { let h=''; for (let i=0;i<count;i++) h+=`<div class="stick" data-pile="${idx}" data-i="${i}"></div>`; return `<div class="pile ${click?'click':''}">${h}</div>`; };
+        if (p.length===1){
+          let b=''; for (let t=1;t<=s.cfg.k;t++) b+=`<button class="btn ${t%2?'':'green'}" data-take="${t}" ${(!can||t>p[0])?'disabled':''}>Togli ${t}</button>`;
+          return `<div class="row"><span class="big">${p[0]}</span><span class="biglbl">fiammiferi<br>rimasti</span></div>${sticks(p[0],0,false)}<div class="take">${b}</div>`;
+        }
+        return p.map((v,i)=>`<div class="pilebox"><div class="pilehead"><span>Mucchio ${i+1}</span><span>${v}</span></div>${sticks(v,i,can)}</div>`).join('')
+          + (can ? '<div class="small">Clicca un fiammifero: lo togli insieme a tutti quelli alla sua destra.</div>' : '');
+      },
+      bind(board, send){
+        board.onclick = e=>{
+          const b = e.target.closest('button[data-take]'); if (b && !b.disabled) return send({pile:0, take:parseInt(b.dataset.take)});
+          const sEl = e.target.closest('.pile.click .stick'); if (!sEl) return;
+          const pile = parseInt(sEl.dataset.pile), i = parseInt(sEl.dataset.i);
+          send({pile, take: st.data.p[pile]-i});
+        };
+        board.onmouseover = e=>{ const sEl = e.target.closest('.pile.click .stick'); if (!sEl) return; const i=parseInt(sEl.dataset.i);
+          sEl.parentNode.querySelectorAll('.stick').forEach(x=>x.classList.toggle('hl', parseInt(x.dataset.i)>=i)); };
+        board.onmouseout = e=>{ const pl = e.target.closest('.pile'); if (pl) pl.querySelectorAll('.stick').forEach(x=>x.classList.remove('hl')); };
+      },
+      guide: [
+        'Se restano 3 fiammiferi e tocca a te, cosa fai? E se ne restano 4?',
+        'Prova con 5, 6, 7 e 8: in quali conviene essere di turno?',
+        'Guarda a fine partita i numeri rimasti dopo le mosse del vincitore: che cosa noti?',
+        'Perché funziona sempre? (Qualunque cosa tolga l’altro, io tolgo quello che manca per arrivare a 4.)',
+        'Due mucchi: cosa succede se i mucchi sono uguali e tocca all’altro?',
+        'Tre mucchi 1, 2, 3: dimostra che chi deve muovere perde, provando tutte le mosse.'
+      ]
+    },
+
+    // ---------------- CENTO ----------------
+    cento: {
+      readCfg(){ const m = clamp($('m').value,2,15,10); const T = clamp($('T').value, m+1, 200, 100); $('m').value=m; $('T').value=T; return {T, m}; },
+      init(){ return {tot:0}; },
+      rules(cfg){ return `Si parte da 0. A turno si aggiunge un numero da 1 a ${cfg.m}. Chi arriva esattamente a ${cfg.T} vince.`; },
+      apply(s, mv){
+        const add = parseInt(mv.add);
+        if (!(add>=1 && add<=s.cfg.m && s.data.tot+add<=s.cfg.T)) return null;
+        s.data.tot += add;
+        const done = s.data.tot===s.cfg.T;
+        return {txt:`aggiunge ${add} → ${s.data.tot}`, snap:String(s.data.tot), over:done, moverWins: done ? true : null};
+      },
+      hint(s){
+        const M = s.cfg.m+1, r = s.cfg.T % M;
+        const t = ((s.cfg.T - s.data.tot) % M + M) % M;
+        const seq = []; for (let v=r; v<=s.cfg.T; v+=M) if (v>0) seq.push(v);
+        const h = (t>=1 && t<=s.cfg.m) ? `Mossa vincente: aggiungi ${t} (arrivi a ${s.data.tot+t}).` : 'Posizione perdente per chi è di turno.';
+        return `${h} Numeri da dire: ${seq.join(', ')}.`;
+      },
+      render(s, can){
+        let b=''; for (let a=1;a<=s.cfg.m;a++) b+=`<button class="btn ${a%2?'':'green'}" data-add="${a}" ${(!can||s.data.tot+a>s.cfg.T)?'disabled':''}>+${a}</button>`;
+        const pct = Math.round(100*s.data.tot/s.cfg.T);
+        return `<div class="row"><span class="big">${s.data.tot}</span><span class="biglbl">su ${s.cfg.T}</span></div><div class="bar"><div style="width:${pct}%"></div></div><div class="take">${b}</div>`;
+      },
+      bind(board, send){ board.onclick = e=>{ const b = e.target.closest('button[data-add]'); if (b && !b.disabled) send({add:parseInt(b.dataset.add)}); }; board.onmouseover=null; board.onmouseout=null; },
+      guide: [
+        'Se il totale è 95 e tocca a te, cosa fai? E se è 89?',
+        'Quale numero devi dire per essere sicuro di arrivare a 100? E prima ancora?',
+        'Guarda i totali dopo le mosse del vincitore: che cosa hanno in comune?',
+        'Assomiglia al gioco dei fiammiferi? In che cosa?',
+        'Se il traguardo fosse 50 e si aggiungesse da 1 a 6, quali numeri bisognerebbe dire?'
+      ]
+    },
+
+    // ---------------- QUINDICI ----------------
+    quindici: {
+      readCfg(){ return {}; },
+      init(){ return {own: Array(10).fill(null)}; },
+      rules(){ return 'A turno si prende un numero da 1 a 9 (ognuno una volta sola). Vince chi per primo ha tre numeri, tra i suoi, con somma 15.'; },
+      apply(s, mv, who){
+        const n = parseInt(mv.n);
+        if (!(n>=1 && n<=9) || s.data.own[n]) return null;
+        s.data.own[n] = who;
+        const mine = []; for (let i=1;i<=9;i++) if (s.data.own[i]===who) mine.push(i);
+        const win = LINES15.find(L=>L.every(x=>s.data.own[x]===who));
+        const full = s.data.own.slice(1).every(x=>x);
+        if (win) return {txt:`prende ${n} → ${win.slice().sort((a,b)=>a-b).join(' + ')} = 15`, snap:mine.join(' '), over:true, moverWins:true};
+        if (full) return {txt:`prende ${n}`, snap:mine.join(' '), over:true, draw:true};
+        return {txt:`prende ${n}`, snap:mine.join(' '), over:false};
+      },
+      hint(s){
+        // minimax on tic-tac-toe equivalent
+        const own = s.data.own.slice();
+        const me = s.turn, op = other(me);
+        const memo = new Map();
+        function key(){ return own.join(','); }
+        function val(turn){
+          const k = key()+turn; if (memo.has(k)) return memo.get(k);
+          let best = -2, any=false;
+          for (let n=1;n<=9;n++){ if (own[n]) continue; any=true;
+            own[n]=turn; let v;
+            if (LINES15.some(L=>L.every(x=>own[x]===turn))) v=1; else v = -val(other(turn));
+            own[n]=null; if (v>best) best=v; if (best===1) break; }
+          const r = any?best:0; memo.set(k,r); return r;
+        }
+        let bestN=null, bestV=-2;
+        for (const n of [5,2,4,6,8,1,3,7,9]){ if (own[n]) continue; own[n]=me;
+          const v = LINES15.some(L=>L.every(x=>own[x]===me)) ? 1 : -val(op); own[n]=null;
+          if (v>bestV){ bestV=v; bestN=n; } }
+        const label = bestV===1 ? 'vincente' : bestV===0 ? 'per pareggiare' : '(si perde comunque se l’altro gioca bene)';
+        const sq = [2,7,6,9,5,1,4,3,8].map(n=>`<div class="${s.data.own[n]? (s.data.own[n]===role?'me':'them') : ''}">${n}</div>`).join('');
+        return {html:`Chi è di turno: mossa ${label} = prendi <b>${bestN}</b>. Il segreto: è il tris sul quadrato magico (ogni riga, colonna e diagonale fa 15).<div class="magic">${sq}</div>`};
+      },
+      render(s, can){
+        const me = role, them = other(role);
+        let h = '<div class="nums">';
+        for (let n=1;n<=9;n++){ const o = s.data.own[n]; h += `<div class="num ${o? (o===me?'me':'them') : 'free'} ${can?'can':''}" data-n="${n}">${n}</div>`; }
+        h += '</div>';
+        const list = w => { const a=[]; for (let n=1;n<=9;n++) if (s.data.own[n]===w) a.push(n); return a.join(', ') || '–'; };
+        h += `<div class="owned"><span><span class="dot" style="background:var(--me)"></span>I tuoi numeri: <b>${list(me)}</b></span><span><span class="dot" style="background:var(--them)"></span>${esc(s.names[them])}: <b>${list(them)}</b></span></div>`;
+        return h;
+      },
+      bind(board, send){ board.onclick = e=>{ const d = e.target.closest('.num.free.can'); if (d) send({n:parseInt(d.dataset.n)}); }; board.onmouseover=null; board.onmouseout=null; },
+      guide: [
+        'Quante sono le terne di numeri diversi da 1 a 9 con somma 15? Prova a elencarle tutte.',
+        'Il 5 compare in quante terne? E il 2? E l’1? Quale numero conviene prendere per primo?',
+        'Hai mai giocato a un gioco in cui ci sono 8 modi di vincere e il centro è la casella migliore?',
+        'Prova a mettere i numeri da 1 a 9 in una griglia 3×3 in modo che ogni riga, colonna e diagonale faccia 15.',
+        'Morale: lo stesso problema può avere "travestimenti" diversi. Ti è capitato nei quesiti del test?'
+      ]
+    },
+
+    // ---------------- CIOCCOLATO ----------------
+    choc: {
+      readCfg(){ return {R: clamp($('R').value,2,8,5), C: clamp($('C').value,2,10,5)}; },
+      init(cfg){ return {h: Array(cfg.C).fill(cfg.R)}; },
+      rules(){ return 'A turno si sceglie un quadretto e lo si mangia insieme a tutti quelli sopra e a destra. Il quadretto verde in basso a sinistra è avvelenato: chi lo mangia perde.'; },
+      apply(s, mv){
+        const r = parseInt(mv.r), c = parseInt(mv.c), h = s.data.h;
+        if (!(c>=0 && c<h.length && r>=0 && r<h[c])) return null;
+        if (r===0 && c===0) return {txt:'mangia il quadretto avvelenato!', snap:'', over:true, moverWins:false};
+        for (let j=c;j<h.length;j++) h[j] = Math.min(h[j], r);
+        const onlyPoison = h[0]===1 && h.slice(1).every(x=>x===0);
+        const left = h.reduce((a,b)=>a+b,0);
+        if (onlyPoison) return {txt:`mangia dalla riga ${r+1}, colonna ${c+1} → resta solo il quadretto avvelenato`, snap:'1', over:true, moverWins:true};
+        return {txt:`mangia dalla riga ${r+1}, colonna ${c+1} → restano ${left} quadretti`, snap:String(left), over:false};
+      },
+      hint(s){
+        const memo = new Map();
+        function win(h){ // true if player to move wins
+          const k = h.join(','); if (memo.has(k)) return memo.get(k);
+          let res = false;
+          outer: for (let c=0;c<h.length;c++) for (let r=0;r<h[c];r++){
+            if (r===0 && c===0) continue;
+            const nh = h.slice(); for (let j=c;j<nh.length;j++) nh[j]=Math.min(nh[j],r);
+            if (nh[0]===1 && nh.slice(1).every(x=>x===0)) { res = true; break outer; }
+            if (!win(nh)) { res = true; break outer; }
+          }
+          memo.set(k,res); return res;
+        }
+        const h = s.data.h;
+        for (let c=0;c<h.length;c++) for (let r=0;r<h[c];r++){
+          if (r===0 && c===0) continue;
+          const nh = h.slice(); for (let j=c;j<nh.length;j++) nh[j]=Math.min(nh[j],r);
+          if ((nh[0]===1 && nh.slice(1).every(x=>x===0)) || !win(nh))
+            return `Mossa vincente: mangia dalla riga ${r+1}, colonna ${c+1} (righe contate dal basso, colonne da sinistra).` + (s.cfg.R===s.cfg.C && h.every(x=>x===s.cfg.R) ? ' Sulla tavoletta quadrata: mangia il quadretto in diagonale accanto al veleno, poi copia le sue mosse sull’altro braccio.' : '');
+        }
+        return 'Posizione perdente per chi è di turno.';
+      },
+      render(s, can){
+        const h = s.data.h, R = s.cfg.R, C = s.cfg.C;
+        let g = `<div class="choc ${can?'can':''}" style="grid-template-columns:repeat(${C},auto)">`;
+        for (let r=R-1;r>=0;r--) for (let c=0;c<C;c++){
+          const present = r < h[c];
+          g += `<div class="sq ${present?'':'eaten'} ${r===0&&c===0&&present?'poison':''}" data-r="${r}" data-c="${c}"></div>`;
+        }
+        return g + '</div>' + (can ? '<div class="small" style="margin-top:8px">Passa sopra un quadretto per vedere cosa mangeresti.</div>' : '');
+      },
+      bind(board, send){
+        board.onclick = e=>{ const q = e.target.closest('.choc.can .sq:not(.eaten)'); if (q) send({r:parseInt(q.dataset.r), c:parseInt(q.dataset.c)}); };
+        board.onmouseover = e=>{ const q = e.target.closest('.choc.can .sq:not(.eaten)'); if (!q) return;
+          const r=parseInt(q.dataset.r), c=parseInt(q.dataset.c);
+          board.querySelectorAll('.sq').forEach(x=>{ const xr=parseInt(x.dataset.r), xc=parseInt(x.dataset.c); x.classList.toggle('hl', !x.classList.contains('eaten') && xr>=r && xc>=c); }); };
+        board.onmouseout = ()=> board.querySelectorAll('.sq.hl').forEach(x=>x.classList.remove('hl'));
+      },
+      guide: [
+        'Con una tavoletta quadrata, quale prima mossa lascia due "bracci" uguali?',
+        'Dopo, come rispondi a ogni sua mossa? (Simmetria: copio sull’altro braccio.)',
+        'Con una sola riga (1×5) chi vince? E con due righe (2×5)?',
+        'Con una tavoletta 4×6 chi comincia vince sempre, ma non c’è una regola semplice per sapere come. Come si può essere sicuri che vince senza sapere la mossa?',
+        'Ti ricorda i due mucchi di fiammiferi? Perché?'
+      ]
+    }
+  };
+
+  // =====================================================================
+  // HOST
+  // =====================================================================
+  function hostNewGame(){
+    const game = $('gameSel').value, G = GAMES[game], cfg = G.readCfg();
+    const names = st && st.names ? st.names : {host:$('hostName').value.trim()||'Prof', guest:'Studente'};
+    const score = st && st.score ? st.score : {host:0, guest:0};
+    st = {game, cfg, data:G.init(cfg), turn:$('first').value, over:false, winner:null, draw:false,
+          log:[], after:{host:[],guest:[]}, names, score};
+    broadcast(); render();
+  }
+  function hostApply(who, mv){
+    if (!st || st.over || st.turn!==who || !mv) return;
+    const res = GAMES[st.game].apply(st, mv, who);
+    if (!res) return;
+    st.log.push(`<b>${esc(st.names[who])}</b> ${res.txt}`);
+    st.after[who].push(res.snap);
+    if (res.over){
+      st.over = true;
+      if (res.draw){ st.draw = true; }
+      else { st.winner = res.moverWins ? who : other(who); st.score[st.winner]++; }
+    } else st.turn = other(who);
+    broadcast(); render();
+  }
+  function broadcast(){ if (role==='host' && conn && conn.open) conn.send({type:'state', state:st}); }
+  function myMove(mv){
+    if (!st || st.over || st.turn!==role) return;
+    if (role==='host') hostApply('host', mv);
+    else if (conn && conn.open) conn.send({type:'move', mv});
+  }
+
+  // =====================================================================
+  // RENDER
+  // =====================================================================
+  function render(){
+    $('hostSettings').classList.toggle('hidden', role!=='host');
+    $('guideCard').classList.toggle('hidden', role!=='host');
+    if (!st || !st.game){ $('status').textContent = role==='guest' ? 'In attesa che l’insegnante avvii la partita…' : ''; return; }
+    const G = GAMES[st.game], me = role, them = other(role);
+    $('optHost').textContent = role==='host' ? 'io' : st.names.host;
+    $('optGuest').textContent = st.names.guest;
+    $('rulesTxt').textContent = G.rules(st.cfg);
+    $('score').innerHTML = `<span>${esc(st.names[me])} (tu) <b>${st.score[me]}</b></span><span>${esc(st.names[them])} <b>${st.score[them]}</b></span>`;
+    let s;
+    if (st.over) s = st.draw ? 'Pareggio!' : (st.winner===me ? 'Hai vinto! Sapresti rifarlo?' : `Ha vinto ${st.names[them]}. Fortuna o strategia?`);
+    else s = st.turn===me ? 'Tocca a te' : `Tocca a ${st.names[them]}…`;
+    $('status').textContent = s;
+    const can = !st.over && st.turn===me;
+    $('board').innerHTML = G.render(st, can);
+    G.bind($('board'), myMove);
+    // hint (host only)
+    let hint = '';
+    if (role==='host' && !st.over){ const h = G.hint(st); hint = typeof h==='string' ? esc(h) : h.html; }
+    $('hint').innerHTML = hint;
+    // guide
+    if (role==='host') $('guide').innerHTML = '<ol>' + G.guide.map(q=>`<li>${esc(q)}</li>`).join('') + '</ol>';
+    // log
+    let lg = st.log.slice().reverse().map(x=>`<div>${x}</div>`).join('');
+    if (st.over && !st.draw && st.game!=='quindici'){
+      const seq = st.after[st.winner].filter(x=>x!=='').join(', ');
+      if (seq) lg = `<div style="margin-bottom:6px">Situazione dopo ogni mossa del vincitore (${esc(st.names[st.winner])}): <span class="seq">${seq}</span></div>` + lg;
+    }
+    $('log').innerHTML = lg || '<div>Nessuna mossa ancora.</div>';
+  }
+
+  // settings visibility
+  function syncSettings(){
+    const g = $('gameSel').value, n = parseInt($('nPiles').value);
+    document.querySelectorAll('.g-nim').forEach(x=>x.classList.toggle('hidden', g!=='nim'));
+    document.querySelectorAll('.g-cento').forEach(x=>x.classList.toggle('hidden', g!=='cento'));
+    document.querySelectorAll('.g-choc').forEach(x=>x.classList.toggle('hidden', g!=='choc'));
+    if (g==='nim'){
+      document.querySelectorAll('.p2').forEach(x=>x.classList.toggle('hidden', n<2));
+      document.querySelectorAll('.p3').forEach(x=>x.classList.toggle('hidden', n<3));
+      document.querySelectorAll('.p1only').forEach(x=>x.classList.toggle('hidden', n!==1));
+      $('lblS1').textContent = n===1 ? 'Fiammiferi' : 'Mucchio 1';
+      if (n===1 && parseInt($('s1').value)<5) $('s1').value = 21;
+      if (n===2){ $('s1').value = 7; $('s2').value = 10; }
+      if (n===3){ $('s1').value = 1; $('s2').value = 2; $('s3').value = 3; }
+    }
+  }
+
+  // =====================================================================
+  // CONNECTION
+  // =====================================================================
+  function setConnected(ok){ $('connPill2').textContent = ok ? 'Collegati' : 'Collegamento perso'; $('connPill2').classList.toggle('ok', ok); }
+  function peerErrorText(err){
+    const t = err && err.type;
+    if (t==='peer-unavailable') return 'Nessuna partita con questo codice. Controlla il codice e che l’insegnante abbia la pagina aperta.';
+    if (t==='network' || t==='server-error' || t==='socket-error' || t==='socket-closed') return 'Problema di rete: controlla la connessione e riprova.';
+    if (t==='browser-incompatible') return 'Questo browser non supporta il gioco online: prova con Chrome, Firefox o Safari aggiornati.';
+    return 'Errore di collegamento (' + (t||'sconosciuto') + '). Riprova.';
+  }
+  function createGame(attempt){
+    if (typeof Peer==='undefined'){ $('hostErr').textContent='Non riesco a caricare il collegamento online. Controlla la connessione e ricarica la pagina.'; return; }
+    attempt = attempt||0;
+    const code = String(1000 + Math.floor(Math.random()*9000));
+    role = 'host';
+    peer = new Peer(PREFIX + code);
+    peer.on('open', ()=>{ $('codeShow').textContent = code; show('waiting'); });
+    peer.on('error', err=>{
+      if (err.type==='unavailable-id' && attempt<5){ peer.destroy(); createGame(attempt+1); return; }
+      $('hostErr').textContent = peerErrorText(err);
+      $('connPill').textContent = peerErrorText(err);
+    });
+    peer.on('connection', c=>{
+      if (conn && conn.open){ c.on('open', ()=>{ c.send({type:'busy'}); setTimeout(()=>c.close(), 300); }); return; }
+      conn = c;
+      conn.on('open', ()=> setConnected(true));
+      conn.on('data', d=>{
+        if (!d || typeof d!=='object') return;
+        if (d.type==='hello'){
+          const gname = String(d.name||'Studente').slice(0,16) || 'Studente';
+          if (!st || !st.game){
+            show('game');
+            st = {names:{host:$('hostName').value.trim()||'Prof', guest:gname}, score:{host:0,guest:0}};
+            hostNewGame();
+          } else { st.names.guest = gname; broadcast(); render(); }
+        } else if (d.type==='move') hostApply('guest', d.mv);
+      });
+      conn.on('close', ()=>{ setConnected(false); conn = null; });
+    });
+  }
+  function joinGame(){
+    if (typeof Peer==='undefined'){ $('guestErr').textContent='Non riesco a caricare il collegamento online. Controlla la connessione e ricarica la pagina.'; return; }
+    const code = $('joinCode').value.trim();
+    if (!/^\d{4}$/.test(code)){ $('guestErr').textContent='Il codice è di 4 cifre.'; return; }
+    const name = $('guestName').value.trim() || 'Studente';
+    $('guestErr').textContent = 'Mi collego…';
+    role = 'guest';
+    peer = new Peer();
+    peer.on('error', err=>{ $('guestErr').textContent = peerErrorText(err); });
+    peer.on('open', ()=>{
+      conn = peer.connect(PREFIX + code, {reliable:true});
+      conn.on('open', ()=>{ $('guestErr').textContent=''; conn.send({type:'hello', name}); show('game'); render(); });
+      conn.on('data', d=>{
+        if (!d || typeof d!=='object') return;
+        if (d.type==='state'){ st = d.state; render(); }
+        if (d.type==='busy'){ show('lobby'); $('guestErr').textContent='In questa partita c’è già un altro studente.'; }
+      });
+      conn.on('close', ()=>{ $('status').textContent='Collegamento perso: ricarica la pagina e rientra con lo stesso codice.'; });
+    });
+  }
+
+  // =====================================================================
+  // EVENTS
+  // =====================================================================
+  $('createBtn').addEventListener('click', ()=>{ $('hostErr').textContent=''; createGame(0); });
+  $('joinBtn').addEventListener('click', joinGame);
+  $('joinCode').addEventListener('keydown', e=>{ if (e.key==='Enter') joinGame(); });
+  $('newBtn').addEventListener('click', hostNewGame);
+  $('gameSel').addEventListener('change', ()=>{ syncSettings(); hostNewGame(); });
+  $('nPiles').addEventListener('change', syncSettings);
+  $('teacher').addEventListener('change', e=> $('app').classList.toggle('teacher-on', e.target.checked));
+  syncSettings();
+
+  // test hook (no network): window.__games for offline checks
+  window.__games = GAMES;
+})();
+</script>
+</body>
+</html>
