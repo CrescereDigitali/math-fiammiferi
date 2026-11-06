@@ -130,7 +130,8 @@
     <div class="card" id="hostSettings">
       <div class="row" style="justify-content:space-between;margin-bottom:12px">
         <strong>Impostazioni (le vede solo l'insegnante)</strong>
-        <span class="pill ok" id="connPill2">Collegati</span>
+        <span class="row"><span class="small">Codice per lo studente: <b id="codeInGame" style="font-size:20px;letter-spacing:.1em;color:var(--ink)">····</b></span>
+        <span class="pill" id="connPill2">In attesa dello studente…</span></span>
       </div>
       <div class="settings">
         <div><label>Gioco</label>
@@ -507,7 +508,7 @@
   // =====================================================================
   // CONNECTION
   // =====================================================================
-  function setConnected(ok){ $('connPill2').textContent = ok ? 'Collegati' : 'Collegamento perso'; $('connPill2').classList.toggle('ok', ok); }
+  function setConnected(ok){ $('connPill2').textContent = ok ? 'Studente collegato' : 'Studente non collegato: può rientrare con lo stesso codice'; $('connPill2').classList.toggle('ok', ok); }
   function peerErrorText(err){
     const t = err && err.type;
     if (t==='peer-unavailable') return 'Nessuna partita con questo codice. Controlla il codice e che l’insegnante abbia la pagina aperta.';
@@ -521,7 +522,12 @@
     const code = String(1000 + Math.floor(Math.random()*9000));
     role = 'host';
     peer = new Peer(PREFIX + code);
-    peer.on('open', ()=>{ $('codeShow').textContent = code; show('waiting'); });
+    peer.on('open', ()=>{
+      $('codeShow').textContent = code; $('codeInGame').textContent = code;
+      show('game');
+      st = {names:{host:$('hostName').value.trim()||'Prof', guest:'Studente'}, score:{host:0,guest:0}};
+      hostNewGame();
+    });
     peer.on('error', err=>{
       if (err.type==='unavailable-id' && attempt<5){ peer.destroy(); createGame(attempt+1); return; }
       $('hostErr').textContent = peerErrorText(err);
@@ -535,6 +541,7 @@
         if (!d || typeof d!=='object') return;
         if (d.type==='hello'){
           const gname = String(d.name||'Studente').slice(0,16) || 'Studente';
+          setConnected(true);
           if (!st || !st.game){
             show('game');
             st = {names:{host:$('hostName').value.trim()||'Prof', guest:gname}, score:{host:0,guest:0}};
