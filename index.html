@@ -67,6 +67,32 @@
   .sq.poison::after{content:"✕";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px}
   .choc.can .sq:not(.eaten){cursor:pointer}
   .sq.hl{outline:3px solid #f2c14e;outline-offset:-3px;filter:brightness(1.15)}
+
+  /* regina */
+  .qgrid{display:inline-grid;gap:3px;padding:8px;background:#efe7d8;border-radius:12px}
+  .qc{width:40px;height:40px;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--ink)}
+  .qc.dark{background:#f6efe2}
+  .qc.goal{background:#f2c14e}
+  .qc.reach{cursor:pointer;box-shadow:inset 0 0 0 2px #c9a465}
+  .qc.reach:hover{background:#fbe7c4}
+  .qc.safe{background:#cfe9da}
+  .qc.goal.safe{background:#f2c14e}
+  /* monete */
+  .coins{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 6px}
+  .coinw{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .coin{width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3c4,#e2b84a 60%,#b98b25);display:flex;align-items:center;justify-content:center;font-family:Fraunces,Georgia,serif;font-size:24px;font-weight:600;color:#5b4310;box-shadow:0 2px 0 rgba(0,0,0,.15)}
+  .coin.silver{background:radial-gradient(circle at 35% 30%,#ffffff,#c9ccd1 60%,#8f949b);color:#3d4146}
+  .coin.taken{opacity:.15}
+  .pos{font-size:12px;color:var(--muted)}
+  .sums{display:flex;gap:24px;font-size:15px;margin:6px 0 10px}
+  /* sim */
+  .simsvg .edge{cursor:pointer}
+  .simsvg .edge:hover + line{stroke:#2b2622}
+  /* stime */
+  .qtext{font-family:Fraunces,Georgia,serif;font-size:26px;line-height:1.25;margin:4px 0 14px}
+  .estrow{display:flex;gap:10px;max-width:520px}
+  .reveal td,.reveal th{padding:6px 12px;text-align:left;border-bottom:1px solid var(--line)}
+  .reveal{border-collapse:collapse;margin:8px 0 10px;font-size:15px}
   /* common */
   .log{font-size:14px;color:var(--muted);max-height:220px;overflow:auto;border-top:1px solid var(--line);margin-top:16px;padding-top:10px}
   .log div{padding:2px 0}
@@ -140,6 +166,10 @@
             <option value="cento">Il gioco del 100</option>
             <option value="quindici">Il gioco del 15</option>
             <option value="choc">Cioccolato avvelenato</option>
+            <option value="regina">La regina nell'angolo</option>
+            <option value="monete">Monete in fila</option>
+            <option value="sim">Il gioco dei triangoli</option>
+            <option value="stime">Gara di stime</option>
           </select></div>
         <!-- nim -->
         <div class="g-nim"><label>Mucchi</label>
@@ -157,6 +187,12 @@
         <!-- choc -->
         <div class="g-choc hidden"><label>Righe</label><input type="number" id="R" min="2" max="8" value="5"></div>
         <div class="g-choc hidden"><label>Colonne</label><input type="number" id="C" min="2" max="10" value="5"></div>
+        <!-- regina -->
+        <div class="g-regina hidden"><label>Scacchiera</label><select id="qN"><option value="6">6 × 6</option><option value="8" selected>8 × 8</option><option value="10">10 × 10</option></select></div>
+        <!-- monete -->
+        <div class="g-monete hidden"><label>Numero di monete</label><select id="nCoins"><option value="6">6</option><option value="8">8</option><option value="10" selected>10</option><option value="12">12</option></select></div>
+        <!-- stime -->
+        <div class="g-stime hidden" style="grid-column:span 2"><label>Domanda</label><select id="qSel"></select></div>
         <!-- common -->
         <div><label>Chi comincia</label>
           <select id="first"><option value="host" id="optHost">io</option><option value="guest" id="optGuest">lo studente</option></select></div>
@@ -420,6 +456,239 @@
         'Con una tavoletta 4×6 chi comincia vince sempre, ma non c’è una regola semplice per sapere come. Come si può essere sicuri che vince senza sapere la mossa?',
         'Ti ricorda i due mucchi di fiammiferi? Perché?'
       ]
+    },
+
+    // ---------------- REGINA (Wythoff) ----------------
+    regina: {
+      readCfg(){ return {N: parseInt($('qN').value)||8}; },
+      init(cfg){ const N=cfg.N; let r,c; do { r = 2+Math.floor(Math.random()*(N-2)); c = 2+Math.floor(Math.random()*(N-2)); } while (r===c); return {r,c}; },
+      rules(){ return 'A turno si sposta la regina verso l’angolo giallo: in giù, a sinistra o in diagonale (in giù a sinistra), di quante caselle si vuole. Chi porta la regina nell’angolo vince.'; },
+      lose(N){ const L=[]; for (let r=0;r<N;r++){ L.push([]); for (let c=0;c<N;c++){
+          let win=false;
+          for (let d=1; d<=Math.max(r,c) && !win; d++){
+            if (r-d>=0 && L[r-d][c]) win=true;
+            if (c-d>=0 && L[r][c-d]) win=true;
+            if (r-d>=0 && c-d>=0 && L[r-d][c-d]) win=true;
+          }
+          L[r][c] = (r===0&&c===0) ? true : !win; } } return L; },
+      ok(s,r2,c2){ const {r,c}=s.data; if (!(r2>=0&&c2>=0)) return false;
+        return (c2===c && r2<r) || (r2===r && c2<c) || (r2<r && r-r2===c-c2); },
+      apply(s, mv){
+        const r2=parseInt(mv.r), c2=parseInt(mv.c);
+        if (!this.ok(s,r2,c2)) return null;
+        const {r,c}=s.data; let how;
+        if (c2===c) how=`in giù di ${r-r2}`; else if (r2===r) how=`a sinistra di ${c-c2}`; else how=`in diagonale di ${r-r2}`;
+        s.data.r=r2; s.data.c=c2;
+        const done = r2===0 && c2===0;
+        return {txt:`sposta la regina ${how}` + (done?' e arriva nell’angolo':''), snap:`(${c2},${r2})`, over:done, moverWins: done?true:null};
+      },
+      hint(s){
+        const L=this.lose(s.cfg.N), {r,c}=s.data;
+        for (let d=1; d<=Math.max(r,c); d++){
+          for (const [r2,c2] of [[r-d,c],[r,c-d],[r-d,c-d]]) if (r2>=0&&c2>=0&&this.ok(s,r2,c2)&&L[r2][c2])
+            return 'Mossa vincente: porta la regina su una casella verde. Le caselle verdi sono quelle da cui chi deve muovere perde. Le prime: 1 a destra e 2 in su dall’angolo (e viceversa), poi 3 e 5, 4 e 7, 6 e 10: le differenze crescono di 1 ogni volta.';
+        }
+        return 'Posizione perdente per chi è di turno: le caselle verdi sono quelle da raggiungere.';
+      },
+      render(s, can){
+        const N=s.cfg.N, {r,c}=s.data;
+        const showSafe = role==='host' && $('teacher').checked;
+        const L = showSafe ? this.lose(N) : null;
+        let g=`<div class="qgrid" style="grid-template-columns:repeat(${N},auto)">`;
+        for (let rr=N-1; rr>=0; rr--) for (let cc=0; cc<N; cc++){
+          const cls=['qc'];
+          if ((rr+cc)%2) cls.push('dark');
+          if (rr===0&&cc===0) cls.push('goal');
+          if (can && this.ok(s,rr,cc)) cls.push('reach');
+          if (showSafe && L[rr][cc] && !(rr===r&&cc===c)) cls.push('safe');
+          g+=`<div class="${cls.join(' ')}" data-r="${rr}" data-c="${cc}">${rr===r&&cc===c?'♛':''}</div>`;
+        }
+        return g+'</div>'+(can?'<div class="small" style="margin-top:8px">Clicca una delle caselle bordate per spostare lì la regina.</div>':'');
+      },
+      bind(board, send){ board.onclick=e=>{ const q=e.target.closest('.qc.reach'); if (q) send({r:parseInt(q.dataset.r), c:parseInt(q.dataset.c)}); }; board.onmouseover=null; board.onmouseout=null; },
+      guide: [
+        'Da quali caselle si arriva nell’angolo in una mossa sola? (Tutta la prima riga, la prima colonna e la diagonale.)',
+        'Allora quali sono le caselle più vicine all’angolo da cui chi deve muovere perde? (Una a destra e due in su, e viceversa.)',
+        'Colora le caselle "sicure" una dopo l’altra partendo dall’angolo: che regola segue la loro posizione?',
+        'Per l’insegnante: le coppie sicure sono (1,2), (3,5), (4,7), (6,10), (8,13)… La differenza aumenta di 1 ogni volta, e il primo numero è sempre il più piccolo non ancora usato. Sono legate al numero aureo 1,618…'
+      ]
+    },
+
+    // ---------------- MONETE IN FILA ----------------
+    monete: {
+      noSeq: true,
+      readCfg(){ return {n: parseInt($('nCoins').value)||10}; },
+      init(cfg){ const coins=[]; for (let i=0;i<cfg.n;i++) coins.push(1+Math.floor(Math.random()*9)); return {coins, L:0, R:cfg.n-1, sum:{host:0,guest:0}}; },
+      rules(){ return 'A turno si prende una moneta da una delle due estremità della fila. Alla fine vince chi ha la somma più alta.'; },
+      apply(s, mv, who){
+        const d=s.data; if (d.L>d.R) return null;
+        let v;
+        if (mv.side==='L'){ v=d.coins[d.L]; d.L++; } else if (mv.side==='R'){ v=d.coins[d.R]; d.R--; } else return null;
+        d.sum[who]+=v;
+        const txt=`prende ${v} ${mv.side==='L'?'a sinistra':'a destra'} (totale ${d.sum[who]})`;
+        if (d.L>d.R){
+          if (d.sum.host===d.sum.guest) return {txt, snap:'', over:true, draw:true};
+          return {txt, snap:'', over:true, winner: d.sum.host>d.sum.guest?'host':'guest'};
+        }
+        return {txt, snap:'', over:false};
+      },
+      hint(s){
+        const d=s.data, c=d.coins, memo={};
+        const f=(L,R)=>{ if (L>R) return 0; const k=L+','+R; if (k in memo) return memo[k]; return memo[k]=Math.max(c[L]-f(L+1,R), c[R]-f(L,R-1)); };
+        const left=c[d.L]-f(d.L+1,d.R), right=c[d.R]-f(d.L,d.R-1);
+        const best = left>=right ? `a sinistra (${c[d.L]})` : `a destra (${c[d.R]})`;
+        let odd=0, even=0; for (let i=d.L;i<=d.R;i++){ if ((i%2)===0) odd+=c[i]; else even+=c[i]; }
+        let par='';
+        if ((d.R-d.L+1)%2===0) par = ` Strategia della parità: le monete d’oro (posizioni dispari) valgono ${odd}, quelle d’argento (pari) ${even}. Chi è di turno può prendere tutte quelle del gruppo più ricco: basta prendere ogni volta la moneta di quel colore che l’altro ha lasciato scoperta.`;
+        return `Mossa migliore: prendi ${best}.` + par;
+      },
+      render(s, can){
+        const d=s.data, me=role, them=other(role);
+        const showPar = role==='host' && $('teacher').checked;
+        let h='<div class="coins">';
+        d.coins.forEach((v,i)=>{ const taken = i<d.L || i>d.R;
+          h+=`<div class="coinw"><div class="coin ${showPar && i%2===1?'silver':''} ${taken?'taken':''}">${v}</div><div class="pos">${i+1}ª</div></div>`; });
+        h+='</div>';
+        h+=`<div class="sums"><span><span class="dot" style="background:var(--me)"></span>Tu: <b>${d.sum[me]}</b></span><span><span class="dot" style="background:var(--them)"></span>${esc(s.names[them])}: <b>${d.sum[them]}</b></span></div>`;
+        if (d.L<=d.R) h+=`<div class="take"><button class="btn" data-side="L" ${can?'':'disabled'}>Prendi a sinistra (${d.coins[d.L]})</button><button class="btn green" data-side="R" ${can?'':'disabled'}>Prendi a destra (${d.coins[d.R]})</button></div>`;
+        return h;
+      },
+      bind(board, send){ board.onclick=e=>{ const b=e.target.closest('button[data-side]'); if (b && !b.disabled) send({side:b.dataset.side}); }; board.onmouseover=null; board.onmouseout=null; },
+      guide: [
+        'È sempre meglio prendere la moneta più grande tra le due? Trova un esempio in cui è sbagliato.',
+        'Con un numero pari di monete, colora di giallo le posizioni dispari (1ª, 3ª, 5ª…) e di grigio le pari. Se prendo la 1ª, che colore hanno le due monete agli estremi?',
+        'Allora chi comincia può prendere TUTTE le monete gialle (o tutte le grigie)? Come?',
+        'Quindi chi comincia, con un numero pari di monete, non perde mai. Perché?',
+        'E con un numero dispari di monete il trucco funziona ancora?'
+      ]
+    },
+
+    // ---------------- SIM (triangoli) ----------------
+    sim: {
+      noSeq: true,
+      readCfg(){ return {}; },
+      init(){ return {e:{}}; },
+      rules(){ return 'Ci sono 6 punti. A turno ognuno colora un segmento che unisce due punti. Chi forma un triangolo con tre segmenti del proprio colore perde.'; },
+      apply(s, mv, who){
+        const a=Math.min(parseInt(mv.a),parseInt(mv.b)), b=Math.max(parseInt(mv.a),parseInt(mv.b));
+        if (!(a>=0&&b<=5&&a<b)) return null;
+        const k=a+'-'+b; if (s.data.e[k]) return null;
+        s.data.e[k]=who;
+        const ek=(x,y)=>Math.min(x,y)+'-'+Math.max(x,y);
+        for (let t=0;t<6;t++){ if (t===a||t===b) continue;
+          if (s.data.e[ek(a,t)]===who && s.data.e[ek(b,t)]===who){
+            s.data.tri=[a,b,t];
+            return {txt:`colora ${String.fromCharCode(65+a)}${String.fromCharCode(65+b)} e chiude il triangolo ${[a,b,t].sort().map(x=>String.fromCharCode(65+x)).join('')}`, snap:'', over:true, moverWins:false};
+          } }
+        if (Object.keys(s.data.e).length===15) return {txt:`colora ${String.fromCharCode(65+a)}${String.fromCharCode(65+b)}`, snap:'', over:true, draw:true};
+        return {txt:`colora ${String.fromCharCode(65+a)}${String.fromCharCode(65+b)}`, snap:'', over:false};
+      },
+      hint(s){
+        const who=s.turn, ek=(x,y)=>Math.min(x,y)+'-'+Math.max(x,y); let safe=0, free=0;
+        for (let a=0;a<6;a++) for (let b=a+1;b<6;b++){ if (s.data.e[a+'-'+b]) continue; free++;
+          let bad=false; for (let t=0;t<6;t++){ if (t===a||t===b) continue; if (s.data.e[ek(a,t)]===who && s.data.e[ek(b,t)]===who) bad=true; }
+          if (!bad) safe++; }
+        return `Chi è di turno ha ${safe} segmenti "sicuri" su ${free} liberi. Non c’è una strategia semplice: il fatto matematico è che il pareggio è impossibile, perché con 6 punti un triangolo di un solo colore si forma sempre.`;
+      },
+      render(s, can){
+        const P=[]; for (let i=0;i<6;i++){ const ang=-Math.PI/2+i*Math.PI/3; P.push([170+120*Math.cos(ang), 160+120*Math.sin(ang)]); }
+        const me=role; let lines='', hits='';
+        for (let a=0;a<6;a++) for (let b=a+1;b<6;b++){
+          const o=s.data.e[a+'-'+b], [x1,y1]=P[a], [x2,y2]=P[b];
+          const tri = s.data.tri && s.data.tri.includes(a) && s.data.tri.includes(b);
+          if (o) lines+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${o===me?'#2f6b5a':'#c4532d'}" stroke-width="${tri?9:5}" stroke-linecap="round"/>`;
+          else { lines+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#d6ccbb" stroke-width="2" stroke-dasharray="5 5"/>`;
+            if (can) hits+=`<line class="edge" data-a="${a}" data-b="${b}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,0)" stroke-width="16"><title>${String.fromCharCode(65+a)}${String.fromCharCode(65+b)}</title></line>`; }
+        }
+        let pts=''; P.forEach(([x,y],i)=>{ pts+=`<circle cx="${x}" cy="${y}" r="9" fill="#2b2622"/><text x="${x+(x>170?16:x<170?-26:-5)}" y="${y+(y>160?24:-14)}" font-size="15" font-family="Inter" fill="#7a6f64">${String.fromCharCode(65+i)}</text>`; });
+        return `<svg class="simsvg" viewBox="0 0 340 320" width="340" height="320">${lines}${hits}${pts}</svg>
+          <div class="owned"><span><span class="dot" style="background:var(--me)"></span>I tuoi segmenti</span><span><span class="dot" style="background:var(--them)"></span>Quelli di ${esc(s.names[other(role)])}</span></div>`
+          + (can?'<div class="small" style="margin-top:6px">Clicca un segmento tratteggiato per colorarlo.</div>':'');
+      },
+      bind(board, send){ board.onclick=e=>{ const l=e.target.closest('.edge'); if (l) send({a:parseInt(l.dataset.a), b:parseInt(l.dataset.b)}); }; board.onmouseover=null; board.onmouseout=null; },
+      guide: [
+        'Quanti segmenti si possono tracciare tra 6 punti? (15: ogni punto si unisce agli altri 5, e 6 × 5 / 2 = 15.)',
+        'Si può finire in pareggio? Prova a immaginare di colorare tutti i 15 segmenti senza triangoli di un solo colore.',
+        'Prendi un punto: da lui partono 5 segmenti. Almeno quanti hanno lo stesso colore? (Almeno 3, principio dei cassetti.)',
+        'Se A è unito a B, C e D con tre segmenti verdi, cosa succede se uno tra BC, BD e CD è verde? E se sono tutti arancioni?',
+        'Con 5 punti invece il pareggio è possibile: disegna un pentagono verde con la stella dentro arancione.'
+      ]
+    },
+
+    // ---------------- GARA DI STIME ----------------
+    stime: {
+      simultaneous: true, noSeq: true,
+      Q: [
+        {q:'Quanti battiti fa il tuo cuore in un’ora?', v:4200, u:'battiti', chain:'70 battiti al minuto × 60 minuti'},
+        {q:'Quante volte sbatti le palpebre in un anno?', v:5000000, u:'volte', chain:'15 al minuto × 60 × 16 ore da sveglio × 365 giorni'},
+        {q:'Quanti passi servono per andare a piedi da Milano a Roma?', v:850000, u:'passi', chain:'circa 600 km = 600.000 m, un passo è circa 0,7 m'},
+        {q:'Quanti capelli hai in testa?', v:100000, u:'capelli', chain:'cuoio capelluto circa 600 cm² × 150–200 capelli per cm²'},
+        {q:'Quante pizze si mangiano in Italia in un anno?', v:3000000000, u:'pizze', chain:'60 milioni di abitanti × circa 1 pizza a settimana × 52 settimane'},
+        {q:'Quanti litri d’acqua si usano nelle case di Milano in un giorno?', v:300000000, u:'litri', chain:'1,4 milioni di abitanti × circa 200 litri a testa'},
+        {q:'Quante tonnellate pesa l’acqua di una piscina olimpionica?', v:2500, u:'tonnellate', chain:'50 m × 25 m × 2 m = 2.500 m³, e 1 m³ d’acqua pesa 1 tonnellata'},
+        {q:'Quante palline da tennis riempirebbero la tua cameretta?', v:100000, u:'palline', chain:'stanza circa 50 m³ = 50 milioni di cm³; una pallina occupa circa 350 cm³; meno i vuoti tra le palline'},
+        {q:'Quanti kg pesa un milione di euro in monete da 1 €?', v:7500, u:'kg', chain:'una moneta pesa circa 7,5 g × 1.000.000'},
+        {q:'Se tutti gli abitanti della Terra si tenessero per mano, quante volte farebbero il giro dell’equatore?', v:300, u:'volte', chain:'8 miliardi × 1,5 m = 12 milioni di km; equatore 40.000 km'},
+        {q:'Quante lattine impilate servono per arrivare in cima al Duomo di Milano, Madonnina compresa?', v:900, u:'lattine', chain:'Duomo circa 108 m; una lattina è alta circa 12 cm'},
+        {q:'Quante persone sdraiate una sull’altra servono per arrivare in cima al Gran Sasso?', v:12000, u:'persone', chain:'circa 2.900 m; una persona sdraiata è alta circa 25 cm'}
+      ],
+      readCfg(){ return {qi: parseInt($('qSel').value)||0}; },
+      init(){ return {est:{host:null,guest:null}}; },
+      rules(){ return 'Tutti e due scrivono la stima senza vedere quella dell’altro. Vince chi ci va più vicino in proporzione (si divide il numero più grande per il più piccolo).'; },
+      parse(t){
+        t=String(t||'').trim().toLowerCase().replace(/\s+/g,' ');
+        const m=t.match(/^([\d.,' ]+)\s*(mila|mille|milion[ei]|miliard[oi])?$/); if (!m) return NaN;
+        let num=m[1].replace(/[ ']/g,'');
+        if (/,/.test(num)) num=num.replace(/\./g,'').replace(',', '.'); else if (/^\d{1,3}(\.\d{3})+$/.test(num)) num=num.replace(/\./g,'');
+        let v=parseFloat(num); const mult={mila:1e3,mille:1e3,milione:1e6,milioni:1e6,miliardo:1e9,miliardi:1e9}[m[2]]||1;
+        return v*mult;
+      },
+      fmt(v){ return Number(v).toLocaleString('it-IT',{maximumFractionDigits:2}); },
+      ratio(x,v){ return Math.max(x/v, v/x); },
+      apply(s, mv, who){
+        const x=Number(mv.est); if (!(x>0) || s.data.est[who]!=null) return null;
+        s.data.est[who]=x;
+        if (s.data.est.host!=null && s.data.est.guest!=null){
+          const q=this.Q[s.cfg.qi], rh=this.ratio(s.data.est.host,q.v), rg=this.ratio(s.data.est.guest,q.v);
+          s.data.done=true;
+          if (Math.abs(rh-rg)<1e-9) return {txt:'ha inviato la stima', snap:'', over:true, draw:true};
+          return {txt:'ha inviato la stima', snap:'', over:true, winner: rh<rg?'host':'guest'};
+        }
+        return {txt:'ha inviato la stima', snap:'', over:false};
+      },
+      status(s){ const me=role, them=other(role);
+        if (s.data.est[me]==null) return 'Scrivi la tua stima';
+        return `Stima inviata. Aspetta ${s.names[them]}…`; },
+      hint(s){ const q=this.Q[s.cfg.qi]; return `Risposta: circa ${this.fmt(q.v)} ${q.u}. Ragionamento: ${q.chain}.`; },
+      render(s, can){
+        const q=this.Q[s.cfg.qi], me=role, them=other(role);
+        let h=`<div class="qtext">${esc(q.q)}</div>`;
+        if (!s.over){
+          h+=`<div class="estrow"><input id="estIn" placeholder="es. 3 milioni, 50 mila, 2500" ${can?'':'disabled'}><button class="btn" id="estBtn" ${can?'':'disabled'}>Invia</button></div>
+              <div class="err" id="estErr"></div>
+              <div class="owned"><span>Tu: <b>${s.data.est[me]!=null?'inviata ✓':'non ancora'}</b></span><span>${esc(s.names[them])}: <b>${s.data.est[them]!=null?'inviata ✓':'non ancora'}</b></span></div>`;
+        } else {
+          const row=w=>{ const x=s.data.est[w], r=this.ratio(x,q.v); return `<tr><td>${esc(s.names[w])}${w===me?' (tu)':''}</td><td><b>${this.fmt(x)}</b></td><td>sbaglia di ${r<1.05?'pochissimo':'×'+this.fmt(Math.round(r*10)/10)}</td></tr>`; };
+          h+=`<table class="reveal"><tr><th>Chi</th><th>Stima</th><th>Distanza</th></tr>${row(me)}${row(them)}<tr><td>Valore stimato</td><td><b>${this.fmt(q.v)}</b> ${esc(q.u)}</td><td></td></tr></table>
+              <div class="small">Ragionamento: ${esc(q.chain)}.</div>`;
+        }
+        return h;
+      },
+      bind(board, send){
+        const go=()=>{ const inp=$('estIn'); if (!inp) return; const v=this.parse(inp.value);
+          if (!(v>0)){ $('estErr').textContent='Scrivi un numero, per esempio 3000, 3.000.000, 3 milioni o 2,5 miliardi.'; return; }
+          send({est:v}); };
+        board.onclick=e=>{ if (e.target.id==='estBtn') go(); };
+        board.onkeydown=e=>{ if (e.target.id==='estIn' && e.key==='Enter') go(); };
+        board.onmouseover=null; board.onmouseout=null;
+      },
+      guide: [
+        'Prima del numero, chiedigli la catena: "quali cose moltiplichi?".',
+        'Arrotondare ogni pezzo a 1, 2 o 5 per una potenza di 10 e poi contare gli zeri.',
+        'Sbagliare di 2–3 volte è un ottimo risultato; di 10 è normale; di 1000 vuol dire che manca un pezzo della catena.',
+        'Dopo ogni domanda: quale pezzo della catena era più incerto?',
+        'Al Volta le risposte differiscono di 10 volte l’una dall’altra: basta azzeccare il numero di zeri.'
+      ]
     }
   };
 
@@ -435,7 +704,8 @@
     broadcast(); render();
   }
   function hostApply(who, mv){
-    if (!st || st.over || st.turn!==who || !mv) return;
+    if (!st || st.over || !mv) return;
+    if (!GAMES[st.game].simultaneous && st.turn!==who) return;
     const res = GAMES[st.game].apply(st, mv, who);
     if (!res) return;
     st.log.push(`<b>${esc(st.names[who])}</b> ${res.txt}`);
@@ -443,13 +713,14 @@
     if (res.over){
       st.over = true;
       if (res.draw){ st.draw = true; }
-      else { st.winner = res.moverWins ? who : other(who); st.score[st.winner]++; }
+      else { st.winner = res.winner ? res.winner : (res.moverWins ? who : other(who)); st.score[st.winner]++; }
     } else st.turn = other(who);
     broadcast(); render();
   }
   function broadcast(){ if (role==='host' && conn && conn.open) conn.send({type:'state', state:st}); }
   function myMove(mv){
-    if (!st || st.over || st.turn!==role) return;
+    if (!st || st.over) return;
+    if (!GAMES[st.game].simultaneous && st.turn!==role) return;
     if (role==='host') hostApply('host', mv);
     else if (conn && conn.open) conn.send({type:'move', mv});
   }
@@ -468,10 +739,13 @@
     $('score').innerHTML = `<span>${esc(st.names[me])} (tu) <b>${st.score[me]}</b></span><span>${esc(st.names[them])} <b>${st.score[them]}</b></span>`;
     let s;
     if (st.over) s = st.draw ? 'Pareggio!' : (st.winner===me ? 'Hai vinto! Sapresti rifarlo?' : `Ha vinto ${st.names[them]}. Fortuna o strategia?`);
+    else if (G.status) s = G.status(st);
     else s = st.turn===me ? 'Tocca a te' : `Tocca a ${st.names[them]}…`;
     $('status').textContent = s;
-    const can = !st.over && st.turn===me;
+    const can = G.simultaneous ? (!st.over && st.data.est[me]==null) : (!st.over && st.turn===me);
+    const keep = $('estIn') ? $('estIn').value : null;
     $('board').innerHTML = G.render(st, can);
+    if (keep && $('estIn')) $('estIn').value = keep;
     G.bind($('board'), myMove);
     // hint (host only)
     let hint = '';
@@ -481,7 +755,7 @@
     if (role==='host') $('guide').innerHTML = '<ol>' + G.guide.map(q=>`<li>${esc(q)}</li>`).join('') + '</ol>';
     // log
     let lg = st.log.slice().reverse().map(x=>`<div>${x}</div>`).join('');
-    if (st.over && !st.draw && st.game!=='quindici'){
+    if (st.over && !st.draw && st.game!=='quindici' && !G.noSeq){
       const seq = st.after[st.winner].filter(x=>x!=='').join(', ');
       if (seq) lg = `<div style="margin-bottom:6px">Situazione dopo ogni mossa del vincitore (${esc(st.names[st.winner])}): <span class="seq">${seq}</span></div>` + lg;
     }
@@ -494,6 +768,8 @@
     document.querySelectorAll('.g-nim').forEach(x=>x.classList.toggle('hidden', g!=='nim'));
     document.querySelectorAll('.g-cento').forEach(x=>x.classList.toggle('hidden', g!=='cento'));
     document.querySelectorAll('.g-choc').forEach(x=>x.classList.toggle('hidden', g!=='choc'));
+    ['regina','monete','stime'].forEach(k=>document.querySelectorAll('.g-'+k).forEach(x=>x.classList.toggle('hidden', g!==k)));
+    const fs = $('first').closest('div'); if (fs) fs.classList.toggle('hidden', g==='stime');
     if (g==='nim'){
       document.querySelectorAll('.p2').forEach(x=>x.classList.toggle('hidden', n<2));
       document.querySelectorAll('.p3').forEach(x=>x.classList.toggle('hidden', n<3));
@@ -582,7 +858,9 @@
   $('newBtn').addEventListener('click', hostNewGame);
   $('gameSel').addEventListener('change', ()=>{ syncSettings(); hostNewGame(); });
   $('nPiles').addEventListener('change', syncSettings);
-  $('teacher').addEventListener('change', e=> $('app').classList.toggle('teacher-on', e.target.checked));
+  $('teacher').addEventListener('change', e=>{ $('app').classList.toggle('teacher-on', e.target.checked); if (st && st.game) render(); });
+  $('qSel').innerHTML = GAMES.stime.Q.map((q,i)=>`<option value="${i}">${i+1}. ${esc(q.q)}</option>`).join('');
+  $('qSel').addEventListener('change', hostNewGame);
   syncSettings();
 
   // test hook (no network): window.__games for offline checks
